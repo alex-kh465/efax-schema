@@ -66,6 +66,37 @@ const Dashboard = () => {
             .sort((a, b) => b.value - a.value);
     }, []);
 
+    const recommendedSchemaData = useMemo(() => {
+        const schemaStats = {};
+
+        data.forEach(item => {
+            if (!item.recommendation_priority) return;
+
+            // Handle multiple recommendations if comma separated
+            const recs = (item.recommendation_priority || '').split(',');
+            recs.forEach(rec => {
+                const match = rec.match(/(.+)\((.+)\)/);
+                if (match) {
+                    const schema = match[1].trim();
+                    const priority = match[2].trim(); // "High", "Medium", "Low"
+
+                    if (!schemaStats[schema]) {
+                        schemaStats[schema] = { name: schema, High: 0, Medium: 0, Low: 0 };
+                    }
+                    if (schemaStats[schema][priority] !== undefined) {
+                        schemaStats[schema][priority]++;
+                    }
+                }
+            });
+        });
+
+        return Object.values(schemaStats).sort((a, b) => {
+            const totalA = a.High + a.Medium + a.Low;
+            const totalB = b.High + b.Medium + b.Low;
+            return totalB - totalA;
+        });
+    }, []);
+
     const filteredData = useMemo(() => {
         return data.filter(item => {
             const matchesSearch = item.url.toLowerCase().includes(searchTerm.toLowerCase());
@@ -160,6 +191,30 @@ const Dashboard = () => {
                                     />
                                     <Legend />
                                 </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Recommendations Section */}
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Recommended Schemas by Priority</h3>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={recommendedSchemaData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                    <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#F3F4F6' }}
+                                        itemStyle={{ color: '#F3F4F6' }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="High" stackId="a" fill="#EF4444" radius={[0, 0, 4, 4]} />
+                                    <Bar dataKey="Medium" stackId="a" fill="#F59E0B" />
+                                    <Bar dataKey="Low" stackId="a" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                                </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
