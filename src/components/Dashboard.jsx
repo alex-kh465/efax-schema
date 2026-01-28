@@ -22,6 +22,8 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
 const Dashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('All');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 50;
 
     const stats = useMemo(() => {
         const totalPages = data.length;
@@ -105,6 +107,18 @@ const Dashboard = () => {
             return matchesSearch && matchesFilter;
         });
     }, [searchTerm, filterType]);
+
+    // Reset to page 1 when filters change
+    useMemo(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterType]);
+
+    const paginatedData = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredData, currentPage]);
+
+    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
 
     const uniqueSchemaTypes = useMemo(() => {
         const types = new Set();
@@ -265,7 +279,7 @@ const Dashboard = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {filteredData.slice(0, 50).map((row, idx) => (
+                                {paginatedData.map((row, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white truncate max-w-xs" title={row.url}>
                                             {row.url.replace('https://www.efax.com', '')}
@@ -321,8 +335,29 @@ const Dashboard = () => {
                             </tbody>
                         </table>
                     </div>
-                    <div className="p-4 border-t border-gray-100 dark:border-gray-700 text-center text-xs text-gray-500">
-                        Showing first 50 results of {filteredData.length}
+                    <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)} of {filteredData.length} results
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                            >
+                                Previous
+                            </button>
+                            <span className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                            >
+                                Next
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
