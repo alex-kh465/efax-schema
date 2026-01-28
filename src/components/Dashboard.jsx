@@ -25,6 +25,8 @@ const Dashboard = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 50;
 
+    const [recommendationFilter, setRecommendationFilter] = useState(null);
+
     const stats = useMemo(() => {
         const totalPages = data.length;
         const avgScore = data.reduce((acc, curr) => acc + (curr.schema_completeness_score || 0), 0) / totalPages;
@@ -104,14 +106,29 @@ const Dashboard = () => {
             const matchesSearch = item.url.toLowerCase().includes(searchTerm.toLowerCase());
             const itemTypes = (item.schema_types_found || '').split(',').map(t => t.trim());
             const matchesFilter = filterType === 'All' || itemTypes.includes(filterType);
-            return matchesSearch && matchesFilter;
+
+            let matchesRecommendation = true;
+            if (recommendationFilter) {
+                const recs = (item.recommendation_priority || '').split(',');
+                matchesRecommendation = recs.some(rec => {
+                    const match = rec.match(/(.+)\((.+)\)/);
+                    if (match) {
+                        const schema = match[1].trim();
+                        const priority = match[2].trim();
+                        return schema === recommendationFilter.schema && priority === recommendationFilter.priority;
+                    }
+                    return false;
+                });
+            }
+
+            return matchesSearch && matchesFilter && matchesRecommendation;
         });
-    }, [searchTerm, filterType]);
+    }, [searchTerm, filterType, recommendationFilter]);
 
     // Reset to page 1 when filters change
     useMemo(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterType]);
+    }, [searchTerm, filterType, recommendationFilter]);
 
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -132,6 +149,16 @@ const Dashboard = () => {
         });
         return ['All', ...Array.from(types).sort()];
     }, []);
+
+    const handleBarClick = (data, index, e) => {
+        // Recharts doesn't consistently pass the clicked stack ID in the first argument for stacked bars
+        // But we can infer it or use the active payload if needed.
+        // Actually, for stacked bars, the `onClick` on `Bar` gives the data item.
+        // We need to know WHICH bar (High, Medium, Low) was clicked.
+        // The `onClick` event on the `Bar` component receives the data object for that specific segment? 
+        // No, it receives the full data object for the category.
+        // However, we can put onClick on the specific <Bar> component for each priority.
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8 font-sans">
@@ -213,21 +240,60 @@ const Dashboard = () => {
                 {/* Recommendations Section */}
                 <div className="grid grid-cols-1 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Recommended Schemas by Priority</h3>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recommended Schemas by Priority</h3>
+                            {recommendationFilter && (
+                                <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800">
+                                    <span className="text-sm text-blue-700 dark:text-blue-300">
+                                        Filtering by: <strong>{recommendationFilter.schema}</strong> ({recommendationFilter.priority})
+                                    </span>
+                                    <button
+                                        onClick={() => setRecommendationFilter(null)}
+                                        className="p-1 hover:bg-blue-100 dark:hover:bg-blue-800 rounded-full transition-colors"
+                                    >
+                                        <span className="sr-only">Clear filter</span>
+                                        <svg className="w-4 h-4 text-blue-700 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={recommendedSchemaData}>
+                                <BarChart
+                                    data={recommendedSchemaData}
+                                    className="cursor-pointer"
+                                >
                                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
                                     <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#F3F4F6' }}
                                         itemStyle={{ color: '#F3F4F6' }}
+                                        cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                                     />
                                     <Legend />
-                                    <Bar dataKey="High" stackId="a" fill="#EF4444" radius={[0, 0, 4, 4]} />
-                                    <Bar dataKey="Medium" stackId="a" fill="#F59E0B" />
-                                    <Bar dataKey="Low" stackId="a" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                                    <Bar
+                                        dataKey="High"
+                                        stackId="a"
+                                        fill="#EF4444"
+                                        radius={[0, 0, 4, 4]}
+                                        onClick={(data) => setRecommendationFilter({ schema: data.name, priority: 'High' })}
+                                    />
+                                    <Bar
+                                        dataKey="Medium"
+                                        stackId="a"
+                                        fill="#F59E0B"
+                                        onClick={(data) => setRecommendationFilter({ schema: data.name, priority: 'Medium' })}
+                                    />
+                                    <Bar
+                                        dataKey="Low"
+                                        stackId="a"
+                                        fill="#3B82F6"
+                                        radius={[4, 4, 0, 0]}
+                                        onClick={(data) => setRecommendationFilter({ schema: data.name, priority: 'Low' })}
+                                    />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
